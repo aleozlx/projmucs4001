@@ -1,0 +1,14 @@
+{
+  "frontend": {
+    "host": "localhost",
+    "database": "projmucs4001",
+    "password": "",
+    "name": "frontend",
+    "connector": "mongodb",
+    "user": "mucs4001admin"
+  },
+  "db": {
+    "name": "db",
+    "connector": "memory"
+  }
+}
