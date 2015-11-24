@@ -1,5 +1,60 @@
 #!/usr/bin/env python
 import argparse
-parser=argparse.ArgumentParser()
-parser.parse_args()
+p0=argparse.ArgumentParser(prefix_chars='+')
+p0.add_argument('+v', dest='verbose', action='store_true', help='verbose infomation')
+p0.add_argument('func', choices=['fsck','runserver','gen-ex','exec','rm','cat','info'], help='functionality to be used')
+p0.add_argument('args', nargs='*', help='arguments passed down to the specified functionality')
+p0args=p0.parse_args()
+verbose=p0args.verbose
+
+def func_fsck(args):
+    p1=argparse.ArgumentParser(prog='fsck')
+    p1.add_argument('path', help='HDFS path to be checked')
+    p1args=p1.parse_args(args)
+    print 'Checking data structure on HDFS:', p1args.path
+
+def func_runserver(args):
+    p1=argparse.ArgumentParser(prog='runserver')
+    p1.add_argument('-p', dest='port', type=int, default=8001, help='TCP port to be listened')
+    p1args=p1.parse_args(args)
+    print 'Launching server at port', p1args.port
+
+def func_gen_ex(args):
+    p1=argparse.ArgumentParser(prog='gen-ex')
+    p1args=p1.parse_args(args)
+    print 'Generating example data'
+    import datagen
+    scale=(2E4, 2.4E4)
+    datagen.main(scale, 'dataset')
+
+def func_exec(args):
+    p1=argparse.ArgumentParser(prog='exec')
+    p1.add_argument('plugin', help='plugin module that contains algorithm to process the dataset')
+    p1.add_argument('path', help='path to be passed to the plugin (inputs/input-id)')
+    p1args=p1.parse_args(args)
+    print 'Launching', p1args.plugin, 'on', p1args.path
+
+def func_rm(args):
+    p1=argparse.ArgumentParser(prog='rm')
+    p1.add_argument('-e', '--expired', action='store_true', help='automatically remove all data that are expired')
+    p1.add_argument('path', nargs='?', help='remove data specified by path on HDFS (results/result-id)')
+    p1args=p1.parse_args(args)
+    if p1args.expired:
+        print 'Removing expired data [FAKED]'
+    if p1args.path:
+        print 'Removing data:', p1args.path
+
+def func_cat(args):
+    p1=argparse.ArgumentParser(prog='cat')
+    p1.add_argument('path', help='print out data specified by path on HDFS (results/result-id)')
+    p1args=p1.parse_args(args)
+
+def func_info(args):
+    p1=argparse.ArgumentParser(prog='info')
+    p1.add_argument('path', help='show info regarding a specific path (results/result-id or jobs/track-id)')
+    p1args=p1.parse_args(args)
+    print p1args.path
+
+if __name__=='__main__':
+    globals()[''.join(['func_', p0args.func.replace('-', '_')])](p0args.args)
 

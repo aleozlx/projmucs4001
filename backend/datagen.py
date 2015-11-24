@@ -95,23 +95,25 @@ def gen_orders((mininum, maximum), part=0):
 		)
 	)
 
-output_path=sys.argv[1]
+output_path=None #sys.argv[1]
 cancel_flag=False
 #if not os.path.isdir(output_path):
 #	os.mkdir(output_path)
+def main(scale, path):
+	global output_path
+	output_path=path
+	write(Collection(regions,
+		name='regions',
+		serializer=lambda i:'%s\n'%i
+	))
+	write(Collection(locations,
+		name='locations',
+		serializer=lambda i:'%s\t%s\n'%(i,lr_mapping[i])
+	))
 
-write(Collection(regions,
-	name='regions',
-	serializer=lambda i:'%s\n'%i
-))
+	#scale=(2E3, 2.4E3)
+	for i in xrange(6):
+		write(gen_orders(scale, part=i))
+	print 'Done'
 
-write(Collection(locations,
-	name='locations',
-	serializer=lambda i:'%s\t%s\n'%(i,lr_mapping[i])
-))
-
-scale=(2E3, 2.4E3)
-for i in xrange(6):
-	write(gen_orders(scale, part=i))
-print 'Done'
 #os.system('du -h dataset/*')
