@@ -1,31 +1,126 @@
 #!/usr/bin/env python
-import argparse
+import os, argparse, subprocess, logging, json
 p0=argparse.ArgumentParser(prefix_chars='+')
-p0.add_argument('+v', dest='verbose', action='store_true', help='verbose infomation')
+p0.add_argument('+v', dest='verbose', action='count', help='verbose infomation')
+p0.add_argument('+t', '++format', default='text', choices=['text','json'], help='output format')
 p0.add_argument('func', choices=['fsck','runserver','gen-ex','exec','rm','cat','info'], help='functionality to be used')
 p0.add_argument('args', nargs='*', help='arguments passed down to the specified functionality')
 p0args=p0.parse_args()
-verbose=p0args.verbose
+logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=[logging.WARNING, logging.INFO, logging.DEBUG][p0args.verbose or 0])
+F_TEXT='text/plain'
+F_JSON='application/json'
+FORMAT={
+    'text': F_TEXT,
+    'json': F_JSON,
+}[p0args.format]
+
+sjoin = lambda *x: '\x20'.join(str(i) for i in x)
+_n = lambda s: s[:-1] if s.endswith('\n') else s
+
+def shell(cmd, async=False):
+    logging.info(cmd)
+    p=subprocess.Popen(cmd, shell=True, bufsize=4*1024, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+    if async:
+        return p
+    if p.wait()==0:
+        logging.debug(_n(p.stderr.read()))
+    return p
+
+ok = lambda o=None: json.dumps({'ok':1, 'data':o})
+class ParentScopeVar(object):
+    __slots__=('val',)
+    def __init__(self):
+        super(ParentScopeVar, self).__init__()
+        self.val=None
+
+def print_err(msg):
+    err = lambda msg: json.dumps({'ok':0, 'errmsg':msg})
+    logging.error(_n(msg))
+    if FORMAT=='text/plain':
+        print msg,
+    else:
+        print err(msg)
 
 def func_fsck(args):
     p1=argparse.ArgumentParser(prog='fsck')
     p1.add_argument('path', help='HDFS path to be checked')
+    p1.add_argument('--destroy', action='store_true', help='remove all data at specified path')
+    p1.add_argument('--repair', action='store_true', help='automatically repair data structure')
     p1args=p1.parse_args(args)
-    print 'Checking data structure on HDFS:', p1args.path
+    logging.info(sjoin('Checking data structure on HDFS:',p1args.path))
+    if p1args.destroy:
+        shell('hadoop fs -rm -r '+p1args.path)
+    e=ParentScopeVar()
+    def exists(*paths):
+        p=shell('hadoop fs -ls '+'\x20'.join(paths))
+        if p.wait()!=0:
+            e.val=p.stderr.read()
+            return False
+        else:
+            return True
+    PATHS=(
+        p1args.path,
+        os.path.join(p1args.path, 'inputs'),
+        os.path.join(p1args.path, 'results'),
+    )
+    def fsck(depth=1):
+        if exists(*PATHS):
+            if FORMAT==F_TEXT:
+                print 'OK'
+            elif FORMAT==F_JSON:
+                print ok()
+            return 1
+        else:
+            if p1args.repair and depth:
+                for path in PATHS:
+                    shell('hadoop fs -mkdir '+path)
+                fsck(depth-1)
+            else:
+                print_err(e.val)
+    return fsck()
 
 def func_runserver(args):
+    """starting script hardcoded"""
+    LOGFILE='/tmp/proj4001_server.log'
+    DJMANAGE='/var/www/mucs4001.proj/frontend/manage.py'
     p1=argparse.ArgumentParser(prog='runserver')
     p1.add_argument('-p', dest='port', type=int, default=8001, help='TCP port to be listened')
     p1args=p1.parse_args(args)
-    print 'Launching server at port', p1args.port
+    if not func_fsck(['proj4001']):
+        logging.error('fsck failed')
+        return
+    logging.info(sjoin('Launching server at port', p1args.port))
+    #shell(sjoin('nohup',DJMANAGE,'runserver','0.0.0.0:'+str(p1args.port),'>',LOGFILE,'&'), async=True)
+    #os.execlp('tail', 'tail', '-f', LOGFILE)
+    os.execlp('python', 'python', DJMANAGE, 'runserver','0.0.0.0:'+str(p1args.port))
 
 def func_gen_ex(args):
     p1=argparse.ArgumentParser(prog='gen-ex')
     p1args=p1.parse_args(args)
-    print 'Generating example data'
-    import datagen
-    scale=(2E4, 2.4E4)
-    datagen.main(scale, 'dataset')
+    try:
+        username=raw_input('Username: ')
+        import sys, django
+        sys.path.append('/var/www/mucs4001.proj/frontend')
+        os.environ['DJANGO_SETTINGS_MODULE']='frontend.settings'
+        django.setup()
+        from django.db import models, transaction
+        from django.contrib.auth.models import User
+        from accounts.models import InputData, ResultData
+        try:
+            user=User.objects.get(username=username)
+        except User.DoesNotExist:
+            logging.error(sjoin('User does not exist',username))
+            return
+        else:
+            with transaction.atomic():
+                inputdata=InputData.objects.create(user=user)
+                print inputdata.serial
+                logging.info(sjoin('Generating example data for',username))
+                import datagen
+                scale=(2E4, 2.4E4)
+                datagen.main(scale, 'dataset')
+    except KeyboardInterrupt:
+        return
 
 def func_exec(args):
     p1=argparse.ArgumentParser(prog='exec')
