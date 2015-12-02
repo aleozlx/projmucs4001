@@ -96,9 +96,13 @@ def func_runserver(args):
 
 def func_gen_ex(args):
     p1=argparse.ArgumentParser(prog='gen-ex')
+    p1.add_argument('-u', dest='username', help='Input dataset owner')
     p1args=p1.parse_args(args)
     try:
-        username=raw_input('Username: ')
+        if p1args.username:
+            username=p1args.username
+        else:
+            username=raw_input('Username: ')
         import sys, django
         sys.path.append('/var/www/mucs4001.proj/frontend')
         os.environ['DJANGO_SETTINGS_MODULE']='frontend.settings'
@@ -109,16 +113,25 @@ def func_gen_ex(args):
         try:
             user=User.objects.get(username=username)
         except User.DoesNotExist:
-            logging.error(sjoin('User does not exist',username))
+            print_err(sjoin('User does not exist',username))
             return
         else:
             with transaction.atomic():
                 inputdata=InputData.objects.create(user=user)
-                print inputdata.serial
                 logging.info(sjoin('Generating example data for',username))
                 import datagen
-                scale=(2E4, 2.4E4)
-                datagen.main(scale, 'dataset')
+                scale=(2E3, 2.4E3)
+                hpath='proj4001/inputs/%s'%inputdata.serial
+                datagen.main(scale, 'hdfs:'+hpath)
+                inputdata.save()
+            try:
+                InputData.objects.get(serial=inputdata.serial)
+                if FORMAT==F_TEXT:
+                    print 'OK', inputdata.serial
+                elif FORMAT==F_JSON:
+                    print ok({'serial': inputdata.serial, 'exp_date': inputdata.exp_date.strftime("%D")})
+            except InputData.DoesNotExist:
+                print_err('I/O Error')
     except KeyboardInterrupt:
         return
 
@@ -127,12 +140,26 @@ def func_exec(args):
     p1.add_argument('plugin', help='plugin module that contains algorithm to process the dataset')
     p1.add_argument('path', help='path to be passed to the plugin (inputs/input-id)')
     p1args=p1.parse_args(args)
-    print 'Launching', p1args.plugin, 'on', p1args.path
+    logging.info(sjoin('Launching', p1args.plugin, 'on', p1args.path))
+    os.environ['PROJ4001']='/var/www/mucs4001.proj/backend'
+    #PROJ4001=/var/www/mucs4001.proj/backend spark-submit plugins/count.py ehede
+    if not os.path.exists('plugins/%s.py'%p1args.plugin):
+        print_err('Plugin doesn\'t exist')
+        return
+    p=shell('spark-submit plugins/%s.py %s'%(p1args.plugin, p1args.path[len('inputs/') if p1args.path.startswith('inputs/') else 0:]))
+    ret=p.stdout.read()
+    if len(ret)==5:
+        if FORMAT==F_TEXT:
+            print 'OK', ret
+        elif FORMAT==F_JSON:
+            print ok({'serial': ret})
+    else:
+        print_err('Exec Error')
 
 def func_rm(args):
     p1=argparse.ArgumentParser(prog='rm')
     p1.add_argument('-e', '--expired', action='store_true', help='automatically remove all data that are expired')
-    p1.add_argument('path', nargs='?', help='remove data specified by path on HDFS (results/result-id)')
+    p1.add_argument('path', nargs='?', help='remove data specified by path on HDFS (results/result-id or inputs/input-id)')
     p1args=p1.parse_args(args)
     if p1args.expired:
         print 'Removing expired data [FAKED]'

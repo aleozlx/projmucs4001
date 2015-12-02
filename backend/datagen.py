@@ -1,4 +1,5 @@
-import os, sys, random, itertools, subprocess, traceback
+import os, sys, random, itertools, subprocess, traceback, logging
+sjoin = lambda *x: '\x20'.join(str(i) for i in x)
 randstr=lambda l:''.join(random.choice('qwertyuiopasdfghjklzxcvbnm') for i in xrange(l))
 populate=lambda l,ll:list(set([randstr(ll) for i in xrange(l)]))
 randrange=lambda l:xrange(random.randint(1,l))
@@ -43,30 +44,31 @@ def write(a):
 			assert isinstance(a.part, int)
 			fname='%s-part-%05d'%(os.path.join(output_path, a.name), a.part)
 			if cancel_flag:
-				print 'Skipped:', fname
+				logging.warn(sjoin('Skipped:', fname))
 				return
 			f=ostream(fname)
 			for progress, p_chunk in enumerate(chunks(a, size/100)):
-				sys.stdout.write('\rWriting %s - %d%%'%(fname, progress))
-				sys.stdout.flush()
+				sys.stderr.write('\rWriting %s - %d%%'%(fname, progress))
+				sys.stderr.flush()
 				for i in p_chunk:
 					f.write(a.serializer(i))
-			print
+			sys.stderr.write('\n')
+			sys.stderr.flush()
 		else:
 			fname=os.path.join(output_path, a.name)
 			if cancel_flag:
-				print 'Skipped:', fname
+				logging.warn(sjoin('Skipped:', fname))
 				return
 			f=ostream(fname)
 			for i in a:
 				f.write(a.serializer(i))
 	except KeyboardInterrupt:
 		cancel_flag=True
-		print 'Cancelled'
+		logging.error('Cancelled')
 	except:
 		traceback.print_exc()
 	else:
-		print size, a.name, 'written'
+		logging.info(sjoin(size, a.name, 'written'))
 	finally:
 		try:
 			f.close()
@@ -114,6 +116,6 @@ def main(scale, path):
 	#scale=(2E3, 2.4E3)
 	for i in xrange(6):
 		write(gen_orders(scale, part=i))
-	print 'Done'
+	logging.info('Done')
 
 #os.system('du -h dataset/*')
