@@ -12,7 +12,7 @@ from accounts.models import InputData, ResultData
 p0=argparse.ArgumentParser(prefix_chars='+')
 p0.add_argument('+v', dest='verbose', action='count', help='verbose infomation')
 p0.add_argument('+t', '++format', default='text', choices=['text','json'], help='output format')
-p0.add_argument('func', choices=['fsck','runserver','gen-ex','exec','rm','cat','info'], help='functionality to be used')
+p0.add_argument('func', choices=['fsck','runserver','gen-ex','exec','rm','cat','meta'], help='functionality to be used')
 p0.add_argument('args', nargs='*', help='arguments passed down to the specified functionality')
 p0args=p0.parse_args()
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=[logging.WARNING, logging.INFO, logging.DEBUG][p0args.verbose or 0])
@@ -187,18 +187,54 @@ def func_rm(args):
     p1.add_argument('path', nargs='?', help='remove data specified by path on HDFS (results/result-id or inputs/input-id)')
     p1args=p1.parse_args(args)
     if p1args.expired:
-        print 'Removing expired data [FAKED]'
+        logging.info('Removing expired data [FAKED]')
     if p1args.path:
-        print 'Removing data:', p1args.path
+        if '/' in p1args.path and not p1args.path.startswith('/'):
+            logging.info(sjoin('Removing data:', p1args.path))
+            p=shell('hadoop fs -rm -r proj4001/%s'%p1args.path)
+            if p.wait()==0:
+                # Try to remove metadata
+                if p1args.path.startswith('inputs/'):
+                    serial=p1args.path[len('inputs/'):]
+                    try:
+                        inputdata=InputData.objects.get(serial=serial)
+                        inputdata.delete()
+                    except:
+                        pass
+                elif p1args.path.startswith('results/'):
+                    serial=p1args.path[len('results/'):]
+                    try:
+                        resultdata=ResultData.objects.get(serial=serial)
+                        resultdata.delete()
+                    except:
+                        pass
+
+                if FORMAT==F_TEXT:
+                    print 'OK'
+                elif FORMAT==F_JSON:
+                    print ok()
+            else:
+                print_err('HDFS `rm` Error')
+        else:
+            print_err('Not allowed')
 
 def func_cat(args):
     p1=argparse.ArgumentParser(prog='cat')
     p1.add_argument('path', help='print out data specified by path on HDFS (results/result-id)')
     p1args=p1.parse_args(args)
+    p=shell('hadoop fs -cat proj4001/%s/part-00000'%p1args.path)
+    if p.wait()==0:
+        if FORMAT==F_TEXT:
+            print p.stdout.read(),
+        elif FORMAT==F_JSON:
+            print ok(p.stdout.read())
+    else:
+        print_err('I/O Error')
+        return
 
-def func_info(args):
-    p1=argparse.ArgumentParser(prog='info')
-    p1.add_argument('path', help='show info regarding a specific path (results/result-id or jobs/track-id)')
+def func_meta(args):
+    p1=argparse.ArgumentParser(prog='meta')
+    p1.add_argument('path', help='show metadata (results/result-id or jobs/track-id ...)')
     p1args=p1.parse_args(args)
     print p1args.path
 
