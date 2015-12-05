@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 import os, argparse, subprocess, logging, json
+
+import sys, django
+sys.path.append('/var/www/mucs4001.proj/frontend')
+os.environ['DJANGO_SETTINGS_MODULE']='frontend.settings'
+django.setup()
+from django.db import models, transaction
+from django.contrib.auth.models import User
+from accounts.models import InputData, ResultData
+
 p0=argparse.ArgumentParser(prefix_chars='+')
 p0.add_argument('+v', dest='verbose', action='count', help='verbose infomation')
 p0.add_argument('+t', '++format', default='text', choices=['text','json'], help='output format')
@@ -103,13 +112,6 @@ def func_gen_ex(args):
             username=p1args.username
         else:
             username=raw_input('Username: ')
-        import sys, django
-        sys.path.append('/var/www/mucs4001.proj/frontend')
-        os.environ['DJANGO_SETTINGS_MODULE']='frontend.settings'
-        django.setup()
-        from django.db import models, transaction
-        from django.contrib.auth.models import User
-        from accounts.models import InputData, ResultData
         try:
             user=User.objects.get(username=username)
         except User.DoesNotExist:
