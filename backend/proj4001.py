@@ -159,19 +159,14 @@ def func_exec(args):
         with transaction.atomic():
             resultdata=ResultData.objects.create(inputdata=inputdata)
             logging.info(sjoin('Everything ready! Executing plugin for', inputdata.user.username))
-            # hpath='proj4001/results/%s'%resultdata.serial
-            # datagen.main(scale, 'hdfs:'+hpath)
             try:
-                p=shell('spark-submit plugins/%s.py %s %s'%(p1args.plugin, input_data, inputdata.serial, resultdata.serial))
+                p=shell('spark-submit plugins/%s.py %s %s'%(p1args.plugin, inputdata.serial, resultdata.serial))
             except KeyboardInterrupt:
                 print_err('Interrupted')
                 return
             ret=p.stdout.read().strip()
             if ret==resultdata.serial:
-                if FORMAT==F_TEXT:
-                    print 'OK', ret
-                elif FORMAT==F_JSON:
-                    print ok({'serial': ret})
+                pass
             else:
                 print_err('Exec Error')
                 return
