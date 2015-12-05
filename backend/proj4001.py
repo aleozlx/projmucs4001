@@ -134,7 +134,9 @@ def func_gen_ex(args):
                     print ok({'serial': inputdata.serial, 'exp_date': inputdata.exp_date.strftime("%D")})
             except InputData.DoesNotExist:
                 print_err('I/O Error')
+                return
     except KeyboardInterrupt:
+        print_err('Interrupted')
         return
 
 def func_exec(args):
@@ -148,15 +150,41 @@ def func_exec(args):
     if not os.path.exists('plugins/%s.py'%p1args.plugin):
         print_err('Plugin doesn\'t exist')
         return
-    p=shell('spark-submit plugins/%s.py %s'%(p1args.plugin, p1args.path[len('inputs/') if p1args.path.startswith('inputs/') else 0:]))
-    ret=p.stdout.read()
-    if len(ret)==5:
-        if FORMAT==F_TEXT:
-            print 'OK', ret
-        elif FORMAT==F_JSON:
-            print ok({'serial': ret})
+    try:
+        inputdata=InputData.objects.get(serial=p1args.path[len('inputs/') if p1args.path.startswith('inputs/') else 0:])
+    except InputData.DoesNotExist:
+        print_err('Input data don\'t exist')
+        return
     else:
-        print_err('Exec Error')
+        with transaction.atomic():
+            resultdata=ResultData.objects.create(inputdata=inputdata)
+            logging.info(sjoin('Everything ready! Executing plugin for', inputdata.user.username))
+            # hpath='proj4001/results/%s'%resultdata.serial
+            # datagen.main(scale, 'hdfs:'+hpath)
+            try:
+                p=shell('spark-submit plugins/%s.py %s %s'%(p1args.plugin, input_data, inputdata.serial, resultdata.serial))
+            except KeyboardInterrupt:
+                print_err('Interrupted')
+                return
+            ret=p.stdout.read().strip()
+            if ret==resultdata.serial:
+                if FORMAT==F_TEXT:
+                    print 'OK', ret
+                elif FORMAT==F_JSON:
+                    print ok({'serial': ret})
+            else:
+                print_err('Exec Error')
+                return
+            resultdata.save()
+        try:
+            ResultData.objects.get(serial=resultdata.serial)
+            if FORMAT==F_TEXT:
+                print 'OK', resultdata.serial
+            elif FORMAT==F_JSON:
+                print ok({'serial': resultdata.serial})
+        except ResultData.DoesNotExist:
+            print_err('I/O Error')
+            return
 
 def func_rm(args):
     p1=argparse.ArgumentParser(prog='rm')
