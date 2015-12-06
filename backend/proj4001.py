@@ -143,6 +143,7 @@ def func_exec(args):
     p1=argparse.ArgumentParser(prog='exec')
     p1.add_argument('plugin', help='plugin module that contains algorithm to process the dataset')
     p1.add_argument('path', help='path to be passed to the plugin (inputs/input-id)')
+    p1.add_argument('--test', action='store_true', help="don't suppress stdout from plugin and don't generate metadata")
     p1args=p1.parse_args(args)
     logging.info(sjoin('Launching', p1args.plugin, 'on', p1args.path))
     os.environ['PROJ4001']='/var/www/mucs4001.proj/backend'
@@ -164,13 +165,16 @@ def func_exec(args):
             except KeyboardInterrupt:
                 print_err('Interrupted')
                 return
-            ret=p.stdout.read().strip()
-            if ret==resultdata.serial:
-                pass
+            if not p1args.test:
+                ret=p.stdout.read().strip()
+                if ret==resultdata.serial:
+                    pass
+                else:
+                    print_err('Exec Error')
+                    return
+                resultdata.save()
             else:
-                print_err('Exec Error')
-                return
-            resultdata.save()
+                print p.stdout.read(),
         try:
             ResultData.objects.get(serial=resultdata.serial)
             if FORMAT==F_TEXT:
@@ -222,7 +226,10 @@ def func_cat(args):
     p1=argparse.ArgumentParser(prog='cat')
     p1.add_argument('path', help='print out data specified by path on HDFS (results/result-id)')
     p1args=p1.parse_args(args)
-    p=shell('hadoop fs -cat proj4001/%s/part-00000'%p1args.path)
+    if p1args.path.startswith('results/'):
+        p=shell('hadoop fs -cat proj4001/%s/part-00000'%p1args.path)
+    else:
+        p=shell('hadoop fs -cat proj4001/%s'%p1args.path)
     if p.wait()==0:
         if FORMAT==F_TEXT:
             print p.stdout.read(),
