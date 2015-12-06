@@ -245,12 +245,12 @@
 								<a href="index.html"><i class="fa fa-dashboard fa-fw"></i> Dashboard</a>
 							</li>
 							<li>
-								<a href="tables.html"><i class="fa fa-table fa-fw"></i> My Files</a>
-							</li>
-							<li>
-								<a href="forms.html"><i class="fa fa-edit fa-fw"></i> My Results</a>
+								<a href="tables.html"><i class="fa fa-table fa-fw"></i> History Files</a>
 							</li>
 						</ul>
+					</div>
+					<div class="left-bottom">
+						<button type="button" class="btn btn-danger" data-toggle="modal" data-target="#Reset">Reset Warehouses Information</button>
 					</div>
 					<!-- /.sidebar-collapse -->
 				</div>
@@ -282,47 +282,41 @@
 												<tr>
 													<th>ID</th>
 													<th>File Name</th>
+													<th>Timestamp</th>
 													<th>Result</th>
-													<th>Information</th>
 												</tr>
 											</thead>
 											<tbody>
 												<tr>
 													<td>1</td>
 													<td>F1</td>
+													<td>2015-11-28 15:49</td>
 													<td>
-													<a href="results.html"><button type="button" class="btn btn-success">
+													<a href="result.html"><button type="button" class="btn btn-success">
 														Run
 													</button></a>
 													</td>
-													<td>
-													<a href="info.html"><button type="button" class="btn btn-info">
-														Info
-													</button></a></td>
+													
 												</tr>
 												<tr>
 													<td>2</td>
 													<td>F2</td>
+													<td>2015-11-28 15:49</td>
 													<td>
-													<button type="button" class="btn btn-success">
+													<a href="result.html"><button type="button" class="btn btn-success">
 														Run
-													</button></td>
-													<td>
-													<a href="info.html"><button type="button" class="btn btn-info">
-														Info
-													</button></a></td>
+													</button></a>
+													</td>													
 												</tr>
 												<tr>
 													<td>3</td>
 													<td>F3</td>
+													<td>2015-11-28 15:49</td>
 													<td>
-													<button type="button" class="btn btn-success">
+													<a href="result.html"><button type="button" class="btn btn-success">
 														Run
-													</button></td>
-													<td>
-													<a href="info.html"><button type="button" class="btn btn-info">
-														Info
-													</button></a></td>
+													</button></a>
+													</td>													
 												</tr>
 											</tbody>
 										</table>
@@ -332,19 +326,42 @@
 								<!-- /.panel-body -->
 							</div>
 							<!-- /.panel -->
-							<div class="form-group">
-								<label>Input your new file here!</label>								
-								<input type="file"  >
-								<br/>
-								<a href="tables.html"><button type="button" class="btn btn-primary">Submit</button></a>
-							</div>
 						</div>
 					</div>
 				</div>
 				<!-- /.container-fluid -->
 			</div>
 			<!-- /#page-wrapper -->
-
+			<div class="row">
+        	 <div class="col-lg-6">
+                   
+                            
+                            <!-- Modal -->
+                            <div class="modal fade" id="Reset" tabindex="-1" role="dialog" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                                            <h4 class="modal-title">Are you sure to reset?</h4>
+                                        </div>
+				                        <div class="modal-body">
+										If you choose to reset warehouses information, all records in your account will be cleaned up! 										  
+										</div>
+										<div class="modal-footer">
+												<button type="button" class="btn btn-default"data-dismiss="modal">Cancle</button>
+												<a href="warehouse.html"><button type="button" class="btn btn-primary">Okay</button></a>
+											</div>
+										</div>
+                                    <!-- /.modal-content -->
+                                </div>
+                                <!-- /.modal-dialog -->
+                            </div>
+                            <!-- /.modal -->
+                     
+                </div>
+                <!-- /.col-lg-6 -->
+        </div>
+        <!-- /.row -->
 		</div>
 		<!-- /#wrapper -->
 
