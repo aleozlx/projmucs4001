@@ -9,7 +9,7 @@ locations=sc.mixin.inputData(fin,'locations')
 
 lr_mapping={location:region for (location, region) in (line.split('\t') for line in locations.collect())}
 
-_orders=[sc.mixin.inputData(fin, relation) for relation in ('orders-part-%05d'%i for i in xrange(6))]
+_orders=(sc.mixin.inputData(fin, relation) for relation in ('orders-part-%05d'%i for i in xrange(6)))
 
 def deserialize(line):
     pattern=re.compile(r'^(\w+)\t(\w+)\t(\d+)\t([\w,]*)\t([\d,;]+)$')
@@ -21,58 +21,65 @@ def rmap(((fro, to), (duration, requirements, packages))):
     return (lr_mapping[fro]+lr_mapping[to], (fro, to, duration, requirements, packages))
 
 orders=reduce(lambda a,b:a.union(b), _orders).map(deserialize).map(rmap)
-orders.cache()
-print orders.take(5)
+print orders.takeSample(False, 2)
 
-rcount1=orders.countByKey()
+def rstat1():
+    def sum_weight((key, (fro, to, duration, requirements, packages))):
+        return key, sum(i[3] for i in packages)
+    def prepare((key, s)):
+        def _key(r):
+            r1, r2=r[:2], r[2:]
+            symmetric=(r1==r2)
+            return (r,0,symmetric) if r1<=r2 else (r2+r1,1,symmetric)
+        newkey, rev, sym=_key(key)
+        return (newkey,(0, s, sym)) if rev else (newkey,(s, 0, sym))
+    def merge((c11,c12,sym1),(c21,c22,sym2)):
+        return (c11+c21,c12+c22,sym1) # sym1==sym2
+    return orders.map(sum_weight).reduceByKey(operator.add).map(prepare).reduceByKey(merge)
+rcount1=rstat1()
+rcount1.cache()
+
+print rcount1.take(2)
+
+def asym((key,(c1,c2,sym))):
+    return not sym
+
+# rcount1={route:weight for (route, weight) in _rc0.collect()}
+
 def rstat2(rc1):
-    rset=set()
-    rev=lambda r:r[2:]+r[:2]
-    ct=lambda r:rc1[r] if r in rc1 else 0
-    for r in rc1:
-        if r in rset:
-            continue
-        rset.add(r)
-        rrev=rev(r)
-        rset.add(rrev)
-        if r==rrev:
-            continue
-        c1=ct(r)
-        c2=ct(rrev)
+    def flatDiff((key,(c1,c2,sym))):
         d=abs(c1-c2)
-        if d<2 or float(d)/max(c1,c2)<0.33:
-            continue
-        yield (r,c1,c2,d)
+        if float(d)/max(c1,c2)<0.33:
+            return []
+        else:
+            return [(key,c1,c2,d)]
+    return rc1.filter(asym).flatMap(flatDiff).sortBy(operator.itemgetter(3), ascending=False).take(60)
 
-rcount2=sorted(rstat2(rcount1), key=operator.itemgetter(3), reverse=True)
+rcount2=rstat2(rcount1)
+print 'Unbalanced'
 print rcount2
 
 def rstat3(rc1):
-    def _rstat3(rc1):
-        rset=set()
-        rev=lambda r:r[2:]+r[:2]
-        ct=lambda r:rc1[r] if r in rc1 else 0
-        for r in rc1:
-            if r in rset:
-                continue
-            rset.add(r)
-            rrev=rev(r)
-            rset.add(rrev)
-            if r==rrev:
-                continue
-            yield (r,ct(r)+ct(rrev))
-    mapping=sorted(_rstat3(rc1), key=operator.itemgetter(1))
-    mmin=mapping[0][1]
-    mmax=mapping[-1][1]
+    mapping=rc1.filter(asym).map(lambda (key,(c1,c2,sym)):(key,c1+c2)).sortBy(operator.itemgetter(1),ascending=False).collect()
+    mmin=mapping[-1][1]
+    mmax=mapping[0][1]
     mrange=mmax-mmin
-    t=float(mrange)*0.1
-    return filter(lambda (r,c):c>=mmax-t, mapping), filter(lambda (r,c):c<=mmin+t, mapping)
+    HI_THRESHOLD=mmax-float(mrange)*0.37
+    LO_THRESHOLD=mmin+float(mrange)*0.016
+    return filter(lambda (r,c):c>=HI_THRESHOLD, mapping), filter(lambda (r,c):c<LO_THRESHOLD, mapping)
 
 rcount3_1, rcount3_2 = rstat3(rcount1)
+print 'High'
 print rcount3_1
+print 'Low'
 print rcount3_2
 
+def rstat4(rc1):
+    return rc1.filter(lambda (key,(c1,c2,sym)):sym).map(lambda (key,(c1,c2,sym)):(key,c1)).sortBy(operator.itemgetter(1),ascending=False).collect()
 
+rcount4 = rstat4(rcount1)
+print 'Hidden'
+print rcount4
 sys.exit(0)
 
 result={
